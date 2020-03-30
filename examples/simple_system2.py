@@ -31,15 +31,15 @@ theta_azimuth = N.pi/2.
 ####################
 # 1: Source creation:
 
-num_rays = 1000000 # Number of rays to be traced.
+num_rays = 1000 # Number of rays to be traced.
 center = N.vstack([0, N.sin(-theta_zenith_plate), 3*N.cos(theta_zenith_plate)]) # center of the source geometry. vstack makes the vector vertical. We use a bit of trigonometry to place the center of the source on the normal vector from the surface we will model.
 zenith_direction = [0,0,1] # verical direction in 3D space.
 source_direction = N.dot(zenith_direction, rotz(theta_azimuth)[:3,:3]) # We rotate around z to align with the azimuth angle of the surface
 source_direction = N.dot(source_direction, rotx(N.pi-theta_zenith_plate)[:3,:3]) # We rotate around x to align with the zenith angle of the plate, plus pi to come from that direction instead of going there. Now we have the direction of the source normal. This has to be a vector of unit length. We rotate the source to be parallel to the flat surface.
 rays_direction = N.dot(zenith_direction, rotz(theta_azimuth)[:3,:3])
 rays_direction = N.dot(rays_direction, rotx(N.pi-theta_zenith_source)[:3,:3]) # General direction of propagation of the rays, this time woith the source angle.
-x = 4 # Length in x direction
-y = 4 # Length in y direction
+x = 10. # Length in x direction
+y = 10. # Length in y direction
 ang_range = 4.65e-3 #(rad) this is the typical angular range of the solar disk. This way of modelling the DNI is called the "Pillbox" unshape model.
 flux = 1000. # (W/m2) the solar irradiance modelled by the source. Here we need to be careful about aaht we model; namely DNI or GHI. If we model DNI, it sis only the Direct Normal Irradiance fraction.
 
@@ -49,6 +49,7 @@ source = oblique_solar_rect_bundle(num_rays, center, source_direction, rays_dire
 
 ####################
 # 2: Assembly creation:
+# top panel
 panel_absorptivity = 0.9 # absorptivity of the surface
 
 panel_width = 1. # width of the rectangle plate in m
@@ -57,18 +58,64 @@ panel_height = 2. # height of the rectangle plate in m
 panel_geometry = RectPlateGM(panel_width, panel_height)
 panel_optics = LambertianReceiver(panel_absorptivity)
 
-plate_rotation = N.dot(rotx(theta_zenith_plate)[:3,:3], rotz(theta_azimuth)[:3,:3]) # Here we directly do the composed rotation matrix to have it as an argument in the following instantiation of the Surface class.
+top_plate_rotation = N.dot(rotx(theta_zenith_plate)[:3,:3], rotz(theta_azimuth)[:3,:3]) # Here we directly do the composed rotation matrix to have it as an argument in the following instantiation of the Surface class.
 
-flat_plate_surface = Surface(geometry=panel_geometry, optics=panel_optics, location=N.array([0,0,1]), rotation=plate_rotation)
+top_plate_surface = Surface(geometry=panel_geometry, optics=panel_optics, location=N.array([0,0,1]), rotation=top_plate_rotation)
 
-flat_plate_object = AssembledObject(surfs=[flat_plate_surface])
+top_plate_object = AssembledObject(surfs=[top_plate_surface])
+
+#bottom panel
+
+bottom_plate_rotation = N.dot(N.dot(rotx(theta_zenith_plate)[:3,:3], rotz(theta_azimuth)[:3,:3]), roty(N.pi)[:3,:3]) # rotating then flipping the bottom panel so it faces the ground
+
+bottom_plate_surface = Surface(geometry=panel_geometry, optics=panel_optics, location=N.array([0,0,0.9]), rotation=bottom_plate_rotation)
+
+bottom_plate_object = AssembledObject(surfs=[bottom_plate_surface])
+
+#frame
+frame_absorptivity = 0.85 #this should model aluminium
+frame_optics = LambertianReflector(frame_absorptivity)
+
+long_frame_length = panel_height
+short_frame_length = panel_width
+frame_height = 0.1
+
+long_frame_geometry = RectPlateGM(long_frame_length, frame_height)
+short_frame_geometry = RectPlateGM(short_frame_length, frame_height)
+
+long_frame_rotation = N.dot(rotx(N.pi/2)[:3,:3], rotz(0)[:3,:3])
+short_frame_rotation = N.dot(roty(N.pi/2)[:3,:3], rotz(0)[:3,:3])
+
+#location of the long frame will need to take into account the rotation of the panel
+delta_y = (panel_width/2)*N.cos(theta_zenith_plate) #change in distance from center of the panel to the end along the horizontal
+delta_z = (panel_width/2)*N.sin(theta_zenith_plate) #change in distance from center of the panel to the end along the vertical
+
+#frame 1 is long frame at front 
+frame1_z = 0.9 - delta_z + frame_height/2
+
+frame1_surface = Surface(geometry=long_frame_geometry, optics=frame_optics, location=N.array([0,-delta_y,frame1_z]), rotation=long_frame_rotation)
+frame1_object = AssembledObject(surfs=[frame1_surface])
+
+#frame 2 is long frame at back
+frame2_z = 0.9 + delta_z + frame_height/2
+
+frame2_surface = Surface(geometry=long_frame_geometry, optics=frame_optics, location=N.array([0,delta_y,frame2_z]), rotation=long_frame_rotation)
+frame2_object = AssembledObject(surfs=[frame2_surface])
+
+#need to do side panels
+
+#frame object
+frame = Assembly(objects=[frame1_object,frame2_object])
+
+#combined panel object 
+panel = Assembly(objects=[top_plate_object,bottom_plate_object, frame])
 
 #ground
 
 ground_absorptivity = 0.8 # absorptivity of the surface
 
-ground_width = 4. # width of the rectangle plate in m
-ground_height = 4. # height of the rectangle plate in m
+ground_width = x # width of the rectangle plate in m
+ground_height = y # height of the rectangle plate in m
 
 ground_geometry = RectPlateGM(ground_width, ground_height)
 ground_optics = LambertianReflector(ground_absorptivity)
@@ -77,28 +124,30 @@ ground_rotation = N.dot(rotx(0)[:3,:3], rotz(0)[:3,:3])
 
 ground_surface = Surface(geometry=ground_geometry, optics=ground_optics, location=N.array([0,0,0]), rotation = ground_rotation)
 
-ground_object = AssembledObject(surfs=[ground_surface]) # replaced "flat_plate" by "ground"
+ground = AssembledObject(surfs=[ground_surface]) 
 
-scene = Assembly(objects=[flat_plate_object,ground_object])
+#all the objects
+scene = Assembly(objects=[panel, ground])
+
 ####################
 
 ####################
 # 3: Build tracer assemply
 engine = TracerEngine(scene)
-#Renderer(engine).show_geom() # This rendering function checks teh geometry only prior to ray tracing.
+Renderer(engine).show_geom() # This rendering function checks teh geometry only prior to ray tracing.
 ####################
 
 ####################
 # 4: Ray-trace:
-engine.ray_tracer(bundle=source) # bundle is a ray-bundle object from tracer. Source functions return ray-bundle objects.
-Renderer(engine).show_rays() # If you want to skip the rendering, just comment this line by adding a '#' charater at the start.
+#engine.ray_tracer(bundle=source) # bundle is a ray-bundle object from tracer. Source functions return ray-bundle objects.
+#Renderer(engine).show_rays() # If you want to skip the rendering, just comment this line by adding a '#' charater at the start.
 ####################
 
 ####################
 # 5: Analyse results:
 absorbed_energy, hit_locations = panel_optics.get_all_hits()
 print hit_locations.shape
-hit_locations = flat_plate_surface.global_to_local(hit_locations) # This is VERY usefu. you can use the global_to_local from a surface to transpose the cooridinates in the global referential to the ones in the local coordinate system of the surface. It makes binning much easier.
+hit_locations = top_plate_surface.global_to_local(hit_locations) # This is VERY usefu. you can use the global_to_local from a surface to transpose the cooridinates in the global referential to the ones in the local coordinate system of the surface. It makes binning much easier.
 
 
 import matplotlib.pyplot as plt # The library to plot data
