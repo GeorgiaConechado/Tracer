@@ -49,26 +49,28 @@ source = oblique_solar_rect_bundle(num_rays, center, source_direction, rays_dire
 
 ####################
 # 2: Assembly creation:
-# top panel
+
+# solar panel
 panel_absorptivity = 0.9 # absorptivity of the surface
 
-panel_width = 1. # width of the rectangle plate in m
-panel_height = 2. # height of the rectangle plate in m
+panel_width = 1. # width of the rectangle plate in m (x axis)
+panel_height = 2. # height of the rectangle plate in m ( y axis)
 
 panel_geometry = RectPlateGM(panel_width, panel_height)
 panel_optics = LambertianReceiver(panel_absorptivity)
 
-top_plate_rotation = N.dot(rotx(theta_zenith_plate*2)[:3,:3], rotz(theta_azimuth)[:3,:3]) # Here we directly do the composed rotation matrix to have it as an argument in the following instantiation of the Surface class.
+#top panel
+no_rotation = N.array([[1,0,0],[0,1,0],[0,0,1]])
 
-top_plate_surface = Surface(geometry=panel_geometry, optics=panel_optics, location=N.array([0,0,1]), rotation=top_plate_rotation)
+top_plate_surface = Surface(geometry=panel_geometry, optics=panel_optics, location=N.array([0,0,0.05]), rotation=no_rotation)
 
 top_plate_object = AssembledObject(surfs=[top_plate_surface])
 
 #bottom panel
 
-bottom_plate_rotation = N.dot(N.dot(rotx(theta_zenith_plate)[:3,:3], rotz(theta_azimuth)[:3,:3]), roty(N.pi)[:3,:3]) # rotating then flipping the bottom panel so it faces the ground
+bottom_plate_rotation = rotx(N.pi)[:3,:3]
 
-bottom_plate_surface = Surface(geometry=panel_geometry, optics=panel_optics, location=N.array([0,0,0.9]), rotation=bottom_plate_rotation)
+bottom_plate_surface = Surface(geometry=panel_geometry, optics=panel_optics, location=N.array([0,0,-0.05]), rotation=bottom_plate_rotation)
 
 bottom_plate_object = AssembledObject(surfs=[bottom_plate_surface])
 
@@ -76,39 +78,45 @@ bottom_plate_object = AssembledObject(surfs=[bottom_plate_surface])
 frame_absorptivity = 0.85 #this should model aluminium
 frame_optics = LambertianReflector(frame_absorptivity)
 
-long_frame_length = panel_height
-short_frame_length = panel_width
-frame_height = 0.1
+long_frame_height = panel_height
+short_frame_height = panel_width
+frame_width = 0.1
 
-long_frame_geometry = RectPlateGM(long_frame_length, frame_height)
-short_frame_geometry = RectPlateGM(short_frame_length, frame_height)
+long_frame_geometry = RectPlateGM(frame_width,long_frame_height)
+short_frame_geometry = RectPlateGM(short_frame_height,frame_width)
 
-long_frame_rotation = N.dot(rotx(N.pi/2)[:3,:3], rotz(0)[:3,:3])
-short_frame_rotation = N.dot(roty(N.pi/2)[:3,:3], rotz(0)[:3,:3])
+frame1_rotation = roty(-N.pi/2)[:3,:3]
+frame2_rotation = roty(N.pi/2)[:3,:3]
+frame3_rotation = rotx(-N.pi/2)[:3,:3]
+frame4_rotation = rotx(N.pi/2)[:3,:3]
 
 #location of the long frame will need to take into account the rotation of the panel
-delta_y = (panel_width/2)*N.cos(theta_zenith_plate) #change in distance from center of the panel to the end along the horizontal
-delta_z = (panel_width/2)*N.sin(theta_zenith_plate) #change in distance from center of the panel to the end along the vertical
 
-#frame 1 is long frame at front 
-frame1_z = 0.9 - delta_z + frame_height/2
-
-frame1_surface = Surface(geometry=long_frame_geometry, optics=frame_optics, location=N.array([0,-delta_y,frame1_z]), rotation=long_frame_rotation)
+#frame 1 is  long frame at front
+frame1_surface = Surface(geometry=long_frame_geometry, optics=frame_optics, location=N.array([-panel_width/2,0,0]), rotation=frame1_rotation)
 frame1_object = AssembledObject(surfs=[frame1_surface])
 
 #frame 2 is long frame at back
-frame2_z = 0.9 + delta_z + frame_height/2
-
-frame2_surface = Surface(geometry=long_frame_geometry, optics=frame_optics, location=N.array([0,delta_y,frame2_z]), rotation=long_frame_rotation)
+frame2_surface = Surface(geometry=long_frame_geometry, optics=frame_optics, location=N.array([panel_width/2,0,0]), rotation=frame2_rotation)
 frame2_object = AssembledObject(surfs=[frame2_surface])
 
-#need to do side panels
+#frame 3 is right hand side frame
+frame3_surface = Surface(geometry=short_frame_geometry, optics=frame_optics, location=N.array([0,panel_height/2,0]), rotation=frame3_rotation)
+frame3_object = AssembledObject(surfs=[frame3_surface])
+
+#frame 3 is right hand side frame
+frame4_surface = Surface(geometry=short_frame_geometry, optics=frame_optics, location=N.array([0,-panel_height/2,0]), rotation=frame4_rotation)
+frame4_object = AssembledObject(surfs=[frame4_surface])
 
 #frame object
-frame = Assembly(objects=[frame1_object,frame2_object])
+frame = Assembly(objects=[frame1_object,frame2_object,frame3_object,frame4_object])
 
 #combined panel object 
 panel = Assembly(objects=[top_plate_object,bottom_plate_object, frame])
+
+#rotate whole panel assembly
+panel.set_rotation(N.dot(rotx(theta_zenith_plate)[:3,:3], rotz(theta_azimuth)[:3,:3]))
+panel.set_location(N.array([0,0,1]))
 
 #ground
 
@@ -127,7 +135,7 @@ ground_surface = Surface(geometry=ground_geometry, optics=ground_optics, locatio
 ground = AssembledObject(surfs=[ground_surface]) 
 
 #all the objects
-scene = Assembly(objects=[panel, ground])
+scene = Assembly(objects=[panel, ground]) #add ground
 
 ####################
 
