@@ -1,3 +1,5 @@
+#this is an old version of the system
+
 # If you are not familiar with Python, this is where we load all the modules that we will need in this code.
 import numpy as N # Numpy is basically the matlab equivalent in Python (but better)
 from tracer.sources import oblique_solar_rect_bundle # a source model
