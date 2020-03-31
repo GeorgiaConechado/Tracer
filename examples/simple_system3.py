@@ -62,16 +62,19 @@ panel_optics = LambertianReceiver(panel_absorptivity)
 #top panel
 no_rotation = N.array([[1,0,0],[0,1,0],[0,0,1]])
 
-top_plate_surface = Surface(geometry=panel_geometry, optics=panel_optics, location=N.array([0,0,0.05]), rotation=no_rotation)
+panel_geometry = RectPlateGM(panel_width, panel_height)
+panel_optics = LambertianReceiver(panel_absorptivity)
 
+top_plate_surface = Surface(geometry=panel_geometry, optics=panel_optics, location=N.array([0,0,0.05]), rotation=no_rotation)
 top_plate_object = AssembledObject(surfs=[top_plate_surface])
 
 #bottom panel
-
 bottom_plate_rotation = rotx(N.pi)[:3,:3]
 
-bottom_plate_surface = Surface(geometry=panel_geometry, optics=panel_optics, location=N.array([0,0,-0.05]), rotation=bottom_plate_rotation)
+panel_geometry = RectPlateGM(panel_width, panel_height)
+panel_optics = LambertianReceiver(panel_absorptivity)
 
+bottom_plate_surface = Surface(geometry=panel_geometry, optics=panel_optics, location=N.array([0,0,-0.05]), rotation=bottom_plate_rotation)
 bottom_plate_object = AssembledObject(surfs=[bottom_plate_surface])
 
 #frame
@@ -81,35 +84,22 @@ frame_optics = LambertianReflector(frame_absorptivity)
 long_frame_height = panel_height
 short_frame_height = panel_width
 frame_width = 0.1
+frame_x = [frame_width, short_frame_height, frame_width, short_frame_height]
+frame_y = [long_frame_height, frame_width, long_frame_height, frame_width]
+frame_rotation = [roty(-N.pi/2)[:3,:3], rotx(N.pi/2)[:3,:3], roty(N.pi/2)[:3,:3], rotx(-N.pi/2)[:3,:3]]
+frame_location = [N.array([-panel_width/2,0,0]), N.array([0,panel_height/2,0]), N.array([panel_width/2,0,0]), N.array([0,-panel_height/2,0])]
 
-long_frame_geometry = RectPlateGM(frame_width,long_frame_height)
-short_frame_geometry = RectPlateGM(short_frame_height,frame_width)
-
-frame1_rotation = roty(-N.pi/2)[:3,:3]
-frame2_rotation = roty(N.pi/2)[:3,:3]
-frame3_rotation = rotx(-N.pi/2)[:3,:3]
-frame4_rotation = rotx(N.pi/2)[:3,:3]
+frame_objects = []
 
 #location of the long frame will need to take into account the rotation of the panel
-
-#frame 1 is  long frame at front
-frame1_surface = Surface(geometry=long_frame_geometry, optics=frame_optics, location=N.array([-panel_width/2,0,0]), rotation=frame1_rotation)
-frame1_object = AssembledObject(surfs=[frame1_surface])
-
-#frame 2 is long frame at back
-frame2_surface = Surface(geometry=long_frame_geometry, optics=frame_optics, location=N.array([panel_width/2,0,0]), rotation=frame2_rotation)
-frame2_object = AssembledObject(surfs=[frame2_surface])
-
-#frame 3 is right hand side frame
-frame3_surface = Surface(geometry=short_frame_geometry, optics=frame_optics, location=N.array([0,panel_height/2,0]), rotation=frame3_rotation)
-frame3_object = AssembledObject(surfs=[frame3_surface])
-
-#frame 3 is right hand side frame
-frame4_surface = Surface(geometry=short_frame_geometry, optics=frame_optics, location=N.array([0,-panel_height/2,0]), rotation=frame4_rotation)
-frame4_object = AssembledObject(surfs=[frame4_surface])
+for i in range(len(frame_x)):
+    frame_geometry = RectPlateGM(frame_x[i], frame_y[i])
+    frame_optics = LambertianReflector(frame_absorptivity)
+    frame_surface = Surface(geometry=frame_geometry, optics=frame_optics, location=frame_location[i], rotation=frame_rotation[i])
+    frame_objects.append(AssembledObject(surfs=[frame_surface]))
 
 #frame object
-frame = Assembly(objects=[frame1_object,frame2_object,frame3_object,frame4_object])
+frame = Assembly(objects=frame_objects)
 
 #combined panel object 
 panel = Assembly(objects=[top_plate_object,bottom_plate_object], subassemblies=[frame])
@@ -163,7 +153,7 @@ from sys import path # this is something to find your local directory without ha
 
 plt.figure()
 plt.subplot(111, aspect='equal')
-bins, xedges, yedges = N.histogram2d(hit_locations[0,:], y=hit_locations[1,:], bins=(6,12), weights=absorbed_energy)
+bins, xedges, yedges = N.histogram2d(hit_locations[0,:], y=hit_locations[1,:], bins=(N.linspace(-panel_width/2.,panel_width/2.,7),N.linspace(-panel_height/2.,panel_height/2.,13)),
 X, Y = N.meshgrid(xedges, yedges) # This meshgrid is a bit annoying but necessary to plot the 2d fluxmap. Mor eon the online documentation of pyplot.
 plt.pcolormesh(X, Y, bins.T) # the .T is the transpose operation. Some functions do some flipping of the axes of teh arrays due to how the code is processing the data.
 plt.xlabel('x (m)')
