@@ -112,7 +112,7 @@ frame4_object = AssembledObject(surfs=[frame4_surface])
 frame = Assembly(objects=[frame1_object,frame2_object,frame3_object,frame4_object])
 
 #combined panel object 
-panel = Assembly(objects=[top_plate_object,bottom_plate_object, frame])
+panel = Assembly(objects=[top_plate_object,bottom_plate_object], subassemblies=[frame])
 
 #rotate whole panel assembly
 panel.set_rotation(N.dot(rotx(theta_zenith_plate)[:3,:3], rotz(theta_azimuth)[:3,:3]))
@@ -135,19 +135,19 @@ ground_surface = Surface(geometry=ground_geometry, optics=ground_optics, locatio
 ground = AssembledObject(surfs=[ground_surface]) 
 
 #all the objects
-scene = Assembly(objects=[panel, ground]) #add ground
+scene = Assembly(objects=[ground], subassemblies=[panel]) #add ground
 
 ####################
 
 ####################
 # 3: Build tracer assemply
 engine = TracerEngine(scene)
-Renderer(engine).show_geom() # This rendering function checks teh geometry only prior to ray tracing.
+#Renderer(engine).show_geom() # This rendering function checks teh geometry only prior to ray tracing.
 ####################
 
 ####################
 # 4: Ray-trace:
-#engine.ray_tracer(bundle=source) # bundle is a ray-bundle object from tracer. Source functions return ray-bundle objects.
+engine.ray_tracer(bundle=source) # bundle is a ray-bundle object from tracer. Source functions return ray-bundle objects.
 #Renderer(engine).show_rays() # If you want to skip the rendering, just comment this line by adding a '#' charater at the start.
 ####################
 
